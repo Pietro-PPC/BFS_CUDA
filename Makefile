@@ -1,5 +1,5 @@
 CC= g++
-CFLAGS= -O2 -Wall -g
+CFLAGS= -Wall
 
 all: bfs_seq
 

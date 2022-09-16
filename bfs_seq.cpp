@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <stack>
+#include <queue>
 
 #define MAX 5000
 
@@ -9,6 +10,24 @@ struct graph_t{
 	int size;
 };
 
+std::vector<int> bfs(graph_t &g, int src){
+	std::vector<int> dist(g.size, -1);
+
+	std::queue<int> q;
+	q.push(src);
+	dist[src] = 0;
+	while (!q.empty()){
+		int u = q.front(); q.pop();
+		for (auto v : g.gl[u]){
+			if (dist[v] == -1){
+				dist[v] = dist[u] + 1;
+				q.push(v);
+			}
+		}
+	}
+
+	return dist;
+}
 
 void component_dfs(graph_t &g, int src, std::vector<bool> &visited){
 
@@ -28,7 +47,7 @@ void component_dfs(graph_t &g, int src, std::vector<bool> &visited){
 
 }
 
-int count_components(graph_t g){
+int count_components(graph_t &g){
 	std::vector<bool> visited(g.size, false);
 
 	int n_components = 0;
@@ -43,7 +62,6 @@ int count_components(graph_t g){
 
 int main(){
 	graph_t g;
-	std::vector<int> dist[MAX];
 
 	int u, v;
 	while (std::cin >> u >> v){
@@ -53,7 +71,10 @@ int main(){
 		g.size = std::max(g.size, v+1);
 	}
 
-	int comps = count_components(g);
-	std::cout << comps << std::endl;
+	std::vector<int> dist = bfs(g, 0);
+	for (int i = 0; i < 4000; ++i){
+		std::cout << dist[i] << ' ';
+	}
+	std::cout << std::endl;
 
 }
