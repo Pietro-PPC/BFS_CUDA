@@ -8,7 +8,9 @@
 #include "chrono.c"
 // #include <helper_cuda.h>
 
+// #define LOG true
 
+// #define print_log(X) LOG ? printf(X) : printf("")
 
 #define GPU_NAME "GTX750-Ti"
 #define MP 5
@@ -62,11 +64,10 @@ int main(int argc, char *argv[])
     int nblk = atoi(argv[2]);
     char option = argv[3][0];
 
+void aloca_vetor_device(uint32_t numElements){
     // Alocações
-    size_t size = numElements * sizeof(uint32_t);  // alloca a big vector all generated random numbers
-    printf("[Generate %ld random numbers, output vector size %ld Bytes]\n",
-               numElements, size); //(1024*1024));
-    
+    size_t size = numElements * sizeof(uint32_t);
+    printf("Aloca vetor de %d elementos\n", numElements);
 
     uint32_t *d_Out1 = NULL;
     err = cudaMalloc((void **)&d_Out1, size);
@@ -82,6 +83,38 @@ int main(int argc, char *argv[])
       exit(1);
     }
 
+}
+
+void aloca_grafo(std::vector< std::pair<int,int> > edges){
+
+
+    for (auto e : edges){
+
+    }
+}
+
+/*
+ * Host main program
+ */
+int main(int argc, char *argv[])
+{
+
+    std::vector<std::pair<int, int>> edges;
+
+    int u, v, max_vert = 0;
+    int edge_num = 0;
+    while (std::cin >> u >> v){
+      edge_num++;
+      edges.push_back({u, v});
+      max_vert = max(max_vert, u);
+      max_vert = max(max_vert, v);
+    }
+
+    max_vert++;
+/*
+    long numElements = atol(argv[1]);
+    int nblk = atoi(argv[2]);
+    char option = argv[3][0];
   
     // Geração de números aleatórios
     int threadsPerBlock = THREADS_PER_BLOCK;
