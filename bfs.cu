@@ -48,7 +48,13 @@ int main(int argc, char *argv[])
     }
     max_vert++;
 
-    thrust::device_vector< uint32_t > g_dev(max_vert, uint32_t);
+    thrust::device_vector< thrust::device_vector<int> > g_dev(max_vert);
+
+    for (auto p : edges){
+        g_dev[p.first].push_back(p.second);
+        g_dev[p.second].push_back(p.first);
+    }
+
     // thrust::host_vector< thrust::host_vector<int> > g_host(max_vert, thrust::device_vector<int>);
 
 /*
