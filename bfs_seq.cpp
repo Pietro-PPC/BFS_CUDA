@@ -72,7 +72,7 @@ int main(){
 	}
 
 	std::vector<int> dist = bfs(g, 0);
-	for (int i = 0; i < 4000; ++i){
+	for (int i = 0; i < 10; ++i){
 		std::cout << dist[i] << ' ';
 	}
 	std::cout << std::endl;
