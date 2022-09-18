@@ -6,9 +6,8 @@
 #include <iostream>
 #include <vector>
 #include "chrono.c"
-// #include <helper_cuda.h>
 
-// #define LOG true
+#define LOG true
 
 // #define print_log(X) LOG ? printf(X) : printf("")
 
@@ -25,15 +24,15 @@
 /*
     Invólucro para cudaMemcpy para lidar com erros
 */
-void copy_mem(uint32_t *srcArr, uint32_t *dstArr, long long numElements, cudaMemcpyKind way){
+void copy_mem(uint32_t *dstArr, uint32_t *srcArr, long long numElements, cudaMemcpyKind way){
     cudaError_t err = cudaSuccess;
 
     size_t size = numElements * sizeof(uint32_t);
     err = cudaMemcpy(dstArr, srcArr, size, way);
 
     if (err != cudaSuccess){
-      fprintf(stderr, "Failed to copy vector C from device to host (error code %s)!\n", cudaGetErrorString(err));
-      exit(EXIT_FAILURE);
+        fprintf(stderr, "Falha ao copiar vetor (Erro: %s)!\n", cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
     }
 }
 
@@ -44,7 +43,8 @@ uint32_t *new_device_array(uint32_t numElements){
     cudaError_t err = cudaSuccess;
 
     size_t size = numElements * sizeof(uint32_t);
-    printf("Alocando vetor de %d elementos\n", numElements);
+    if (LOG)
+        printf("Alocando vetor de %d elementos na GPU\n", numElements); 
 
     uint32_t *d_arr = NULL;
     err = cudaMalloc((void **)&d_arr, size);
@@ -68,6 +68,15 @@ uint32_t *new_host_array(uint32_t numElements){
     }
 
     return h_arr;
+}
+
+/*
+    Função auxiliar para imprimir vetor
+*/
+void print_array(uint32_t *arr, int size){
+    for (int i = 0; i < size; ++i)
+        std::cout << arr[i] << " ";
+    std::cout << std::endl;
 }
 
 /*
@@ -97,9 +106,9 @@ void free_host_array(uint32_t *hos_array){
 */
 void gen_compact_list(uint32_t *vert, uint32_t *list, std::vector< std::vector<int> > &g){
     int vert_i = 0, list_i = 0;
-    for (auto u : g){
+    for (auto v_list : g){
         vert[vert_i] = list_i;
-        for (auto v : u) list[list_i++] = v;
+        for (auto v : v_list) list[list_i++] = v;
 
         vert_i++;
     }
@@ -128,12 +137,11 @@ void gen_dev_graph(std::vector< std::pair<int,int> > &edges,
 
     gen_compact_list(g_vert_hos, g_list_hos, g_hos);
 
-    copy_mem(*g_vert_dev, g_vert_hos, vert_n, HOS2DEV);
-    copy_mem(*g_list_dev, g_list_hos, vert_n, HOS2DEV);
+    copy_mem(*g_vert_dev, g_vert_hos, vert_n+1, HOS2DEV);
+    copy_mem(*g_list_dev, g_list_hos, edges.size()*2+1, HOS2DEV);
 
     free_host_array(g_vert_hos);
     free_host_array(g_list_hos);
-
 }
 
 
@@ -142,14 +150,13 @@ void gen_dev_graph(std::vector< std::pair<int,int> > &edges,
  */
 int main(int argc, char *argv[])
 {
-
     std::vector<std::pair<int, int>> edges;
     int vert_n = 0, edge_n;
     int u, v;
     while (std::cin >> u >> v){
         edges.push_back({u, v});
-        vert_n = max(vert_n, u);
-        vert_n = max(vert_n, v);
+        vert_n = std::max(vert_n, u);
+        vert_n = std::max(vert_n, v);
     }
     vert_n++;
     edge_n = edges.size();
@@ -157,6 +164,10 @@ int main(int argc, char *argv[])
     uint32_t *g_vert_dev, *g_list_dev;
     gen_dev_graph(edges, &g_vert_dev, &g_list_dev, vert_n);
 
+    uint32_t *g_vert_hos = new_host_array(vert_n+1);
+
+    free_device_array(g_vert_dev);
+    free_device_array(g_list_dev);
 
 /*
     long numElements = atol(argv[1]);
