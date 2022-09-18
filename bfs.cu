@@ -25,7 +25,7 @@
 /*
     Invólucro para cudaMemcpy para lidar com erros
 */
-void copy_mem(uint32_t *srcArr, uint32_t *dstArr, long long numElements, int way){
+void copy_mem(uint32_t *srcArr, uint32_t *dstArr, long long numElements, cudaMemcpyKind way){
     cudaError_t err = cudaSuccess;
 
     size_t size = numElements * sizeof(uint32_t);
@@ -41,7 +41,7 @@ void copy_mem(uint32_t *srcArr, uint32_t *dstArr, long long numElements, int way
     Aloca vetor com numElements elementos no device
 */
 uint32_t *new_device_array(uint32_t numElements){
-    cudaError_t err;
+    cudaError_t err = cudaSuccess;
 
     size_t size = numElements * sizeof(uint32_t);
     printf("Alocando vetor de %d elementos\n", numElements);
@@ -60,18 +60,21 @@ uint32_t *new_device_array(uint32_t numElements){
     Aloca vetor com numElements elementos no host
 */
 uint32_t *new_host_array(uint32_t numElements){
-    uint32_t *h_arr = (uint32_t *) malloc(size);
+    uint32_t *h_arr = (uint32_t *) malloc(numElements * sizeof(uint32_t));
 
     if (!h_arr ){
         fprintf(stderr, "Falha ao alocar vetor local!\n");
         exit(1);
     }
+
+    return h_arr;
 }
 
 /*
     Desaloca vetor no device
 */
 void free_device_array(uint32_t *dev_array){
+    cudaError_t err = cudaSuccess;
 
     err = cudaFree(dev_array);
     if (err != cudaSuccess)
@@ -96,7 +99,7 @@ void gen_compact_list(uint32_t *vert, uint32_t *list, std::vector< std::vector<i
     int vert_i = 0, list_i = 0;
     for (auto u : g){
         vert[vert_i] = list_i;
-        for (auto v : g[u]) list[list_i++] = v;
+        for (auto v : u) list[list_i++] = v;
 
         vert_i++;
     }
@@ -125,8 +128,8 @@ void gen_dev_graph(std::vector< std::pair<int,int> > &edges,
 
     gen_compact_list(g_vert_hos, g_list_hos, g_hos);
 
-    copy_mem(g_vert_dev, g_vert_hos, vert_n, HOS2DEV);
-    copy_mem(g_list_dev, g_list_hos, vert_n, HOS2DEV);
+    copy_mem(*g_vert_dev, g_vert_hos, vert_n, HOS2DEV);
+    copy_mem(*g_list_dev, g_list_hos, vert_n, HOS2DEV);
 
     free_host_array(g_vert_hos);
     free_host_array(g_list_hos);
@@ -142,6 +145,7 @@ int main(int argc, char *argv[])
 
     std::vector<std::pair<int, int>> edges;
     int vert_n = 0, edge_n;
+    int u, v;
     while (std::cin >> u >> v){
         edges.push_back({u, v});
         vert_n = max(vert_n, u);
@@ -151,7 +155,7 @@ int main(int argc, char *argv[])
     edge_n = edges.size();
 
     uint32_t *g_vert_dev, *g_list_dev;
-    gen_dev_graph(edges, g_vert_dev, g_list_dev, vert_n);
+    gen_dev_graph(edges, &g_vert_dev, &g_list_dev, vert_n);
 
 
 /*
