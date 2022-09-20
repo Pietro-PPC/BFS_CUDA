@@ -146,7 +146,7 @@ void gen_dev_graph(std::vector< std::pair<int,int> > &edges,
 
 
 __global__ 
-bool process_frontier(
+void process_frontier(
     uint32_t *g_vert, uint32_t *g_list, 
     uint32_t *dist, uint32_t *proc, uint32_t *fron, 
     int vert_sz, int list_sz, uint32_t *ended){
@@ -156,8 +156,9 @@ bool process_frontier(
     int bdim = blockDim.x;
     int vertIdx = bid*bdim + tid;
 
+    if (vertIdx >= vert_sz-1) return;
 
-    if (vertIdx < vert_sz-1 && fron[vertIdx]){
+    if (fron[vertIdx]){
         fron[vertIdx] = 0;
         proc[vertIdx] = 1;
         for (int i = g_vert[vertIdx]; i < g_vert[vertIdx+1]; ++i){
@@ -168,8 +169,9 @@ bool process_frontier(
         }
     }
 
+    if (vertIdx == 0) *ended = 1;
     __syncthreads();
-    if ( fron[vertIdx] ) *ended = 1;
+    if ( fron[vertIdx] ) *ended = 0;
 
 }
 
@@ -195,29 +197,42 @@ int main(int argc, char *argv[])
     uint32_t *g_vert_hos = new_host_array(vert_n+1);
 
 
-
     uint32_t *dist = new_device_array(vert_n);
     uint32_t *proc = new_device_array(vert_n);
     uint32_t *fron = new_device_array(vert_n);
+    uint32_t one = 1;
+
+    cudaMemset(dist, 0xff, vert_n*sizeof(uint32_t));
+    cudaMemset(proc, 0, vert_n*sizeof(uint32_t));
+    cudaMemset(fron, 0, vert_n*sizeof(uint32_t));
+
+    cudaMemset(dist, 0, sizeof(uint32_t)); // dist[0] = 0;
+    cudaMemcpy(fron, &one, sizeof(uint32_t), HOS2DEV);
 
     int n_blocks = (vert_n + THREADS_PER_BLOCK-1) / THREADS_PER_BLOCK;
-    __device__ uint32_t ended_dev = false;
+    uint32_t *ended_dev = new_device_array(1);
 
+    printf("%d blocos de %d threads.\n", n_blocks, THREADS_PER_BLOCK);
 
-    process_frontier<<<n_blocks, THREADS_PER_BLOCK>>>(
-        g_vert_dev, g_list_dev, 
-        dist, proc, fron, 
-        vert_n+1, edges.size()*2 + 1, &ended_dev);
-    
-    uint32_t ended_hos;
-    copy_mem(&ended_hos, &ended_dev, 1, DEV2HOS);
+    uint32_t ended_hos = 0;
+    uint32_t *fron_hos = new_host_array(vert_n);
+    int cnt = 0;
+    while (!ended_hos && cnt < 10){
+        cnt++;
 
+        process_frontier<<<n_blocks, THREADS_PER_BLOCK>>>(
+            g_vert_dev, g_list_dev, 
+            dist, proc, fron, 
+            vert_n+1, edges.size()*2 + 1, ended_dev);
+        
+        cudaDeviceSynchronize();
+        
+        copy_mem(&ended_hos, ended_dev, 1, DEV2HOS);
+        copy_mem(fron_hos, fron, vert_n, DEV2HOS);
 
-    uint32_t *hos_fron = new_host_array(vert_n);
-    copy_mem(hos_fron, fron, vert_n, DEV2HOS);
-    print_array(hos_fron, vert_n);
-
-
+        printf("Cabou ? %s\n", ended_hos ? "Sim" : "Não");
+        print_array(fron_hos, vert_n);
+    }
 
     free_device_array(g_vert_dev);
     free_device_array(g_list_dev);
