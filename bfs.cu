@@ -145,6 +145,34 @@ void gen_dev_graph(std::vector< std::pair<int,int> > &edges,
 }
 
 
+__global__ 
+bool process_frontier(
+    uint32_t *g_vert, uint32_t *g_list, 
+    uint32_t *dist, uint32_t *proc, uint32_t *fron, 
+    int vert_sz, int list_sz, uint32_t *ended){
+
+    int tid = threadIdx.x;
+    int bid = blockIdx.x;
+    int bdim = blockDim.x;
+    int vertIdx = bid*bdim + tid;
+
+
+    if (vertIdx < vert_sz-1 && fron[vertIdx]){
+        fron[vertIdx] = 0;
+        proc[vertIdx] = 1;
+        for (int i = g_vert[vertIdx]; i < g_vert[vertIdx+1]; ++i){
+            if (!proc[ g_list[i] ]){
+                fron[ g_list[i] ] = 1;
+                dist[ g_list[i] ] = dist[vertIdx] + 1;
+            }
+        }
+    }
+
+    __syncthreads();
+    if ( fron[vertIdx] ) *ended = 1;
+
+}
+
 /*
  * Host main program
  */
@@ -166,85 +194,36 @@ int main(int argc, char *argv[])
 
     uint32_t *g_vert_hos = new_host_array(vert_n+1);
 
+
+
+    uint32_t *dist = new_device_array(vert_n);
+    uint32_t *proc = new_device_array(vert_n);
+    uint32_t *fron = new_device_array(vert_n);
+
+    int n_blocks = (vert_n + THREADS_PER_BLOCK-1) / THREADS_PER_BLOCK;
+    __device__ uint32_t ended_dev = false;
+
+
+    process_frontier<<<n_blocks, THREADS_PER_BLOCK>>>(
+        g_vert_dev, g_list_dev, 
+        dist, proc, fron, 
+        vert_n+1, edges.size()*2 + 1, &ended_dev);
+    
+    uint32_t ended_hos;
+    copy_mem(&ended_hos, &ended_dev, 1, DEV2HOS);
+
+
+    uint32_t *hos_fron = new_host_array(vert_n);
+    copy_mem(hos_fron, fron, vert_n, DEV2HOS);
+    print_array(hos_fron, vert_n);
+
+
+
     free_device_array(g_vert_dev);
     free_device_array(g_list_dev);
-
-/*
-    long numElements = atol(argv[1]);
-    int nblk = atoi(argv[2]);
-    char option = argv[3][0];
-  
-    // Geração de números aleatórios
-    int threadsPerBlock = THREADS_PER_BLOCK;
-    int usePersistentKernel = 1;
-
-    // Lançamento do kernel persistente CUDA
-    curand_kernel_uint32_persT<<<nblk, threadsPerBlock>>>( d_Out1, numElements, SEED );
-
-    err = cudaGetLastError();
-    if (err != cudaSuccess)
-    {
-        fprintf(stderr, "Failed to launch curand_kernel_uint32_persT kernel (error code %s)!\n", 
-                         cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
-    }
-    cudaDeviceSynchronize();
-
-    
-
-    // Cálculo do máximo do vetor
-    int blocksPerGrid = (numElements/2 + threadsPerBlock - 1) / threadsPerBlock;
-    chronometer_t c3;
-    
-    int curBlocks = blocksPerGrid;
-    int curElements = numElements;
-
-    chrono_reset(&c3);
-    if (option == 'm'){
-      chrono_start(&c3);
-      
-      while (curBlocks >= 1){
-          printf("Chamando kernel de soma para %d elementos com %d bloco%s de %d threads\n", curElements, curBlocks, curBlocks>1 ? "s" : "", threadsPerBlock);
-          max_reduction_many<<<curBlocks, threadsPerBlock>>>(d_Out1, curElements);
-          
-          cudaDeviceSynchronize();
-
-          curElements = curBlocks;
-          // Não pode haver número ímpar de elementos
-          if (curElements > 1) curElements += curElements%2;
-
-          curBlocks = (curElements/2 + threadsPerBlock - 1) / threadsPerBlock;
-      }
-
-      chrono_stop(&c3);
-    }
-    else if (option == 'p'){
-      chrono_start(&c3);
-      
-      while(curElements > 1){
-        printf("Chamando kernel de soma para %d elementos com %d bloco%s de %d threads\n", curElements, nblk, nblk>1 ? "s" : "", threadsPerBlock);
-        max_reduction_persistent<<<nblk, threadsPerBlock>>>(d_Out1, curElements);
-
-        cudaDeviceSynchronize();
-
-        // Evitar número ímpar de elementos
-        if (curElements > 1) curElements += curElements%2;
-        curElements = (curElements/2 + threadsPerBlock - 1) / threadsPerBlock;
-      }
-
-      chrono_stop(&c3);
-    } else {
-      fprintf(stderr, "invalid argument!\n");
-      return 1;
-    }
-
-    // Copia resultado final para CPU
-    uint32_t res;
-    copy_from_device(&res , d_Out1, sizeof(uint32_t));
-
-    printf("Máximo: %u\n", res);
-    printf("Tempo:  %.3fms\n", chrono_gettotal(&c3)/1000000.0);
-    */
+    free_device_array(dist);
+    free_device_array(proc);
+    free_device_array(fron);
 
     return 0;
 }
