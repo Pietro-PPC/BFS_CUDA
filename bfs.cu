@@ -26,8 +26,7 @@
 */
 void print_array(uint32_t *arr, int size){
     for (int i = 0; i < size; ++i)
-        std::cout << arr[i] << " ";
-    std::cout << std::endl;
+        std::cout << arr[i] << "\n";
 }
 
 /************* INVÓLUCROS DE FUNÇÕES CUDA ************/
@@ -276,6 +275,8 @@ int main(int argc, char *argv[])
     // Aloca vetor de distâncias roda BFS 
     uint32_t *dist_hos = new_host_array(vert_n);
     calculate_bfs(dist_hos, g_vert_dev, g_list_dev, vert_n, edge_n);
+
+    print_array(dist_hos, vert_n);
 
     // Libera memória
     free_host_array(dist_hos);
