@@ -72,9 +72,11 @@ int main(){
 	}
 
 	std::vector<int> dist = bfs(g, 0);
-	for (int i = 0; i < 10; ++i){
-		std::cout << dist[i] << ' ';
+  int mai = 0;
+	for (int i = 0; i < g.size; ++i){
+    //mai = std::max(mai, dist[i]);
+    std::cout << dist[i] << std::endl;
 	}
-	std::cout << std::endl;
+	std::cout << /*mai << */ std::endl;
 
 }

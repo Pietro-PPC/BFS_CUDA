@@ -7,7 +7,7 @@
 #include <vector>
 #include "chrono.c"
 
-#define LOG true
+#define LOG false
 
 // #define print_log(X) LOG ? printf(X) : printf("")
 
@@ -212,7 +212,7 @@ int main(int argc, char *argv[])
     int n_blocks = (vert_n + THREADS_PER_BLOCK-1) / THREADS_PER_BLOCK;
     uint32_t *ended_dev = new_device_array(1);
 
-    printf("%d blocos de %d threads.\n", n_blocks, THREADS_PER_BLOCK);
+    //printf("%d blocos de %d threads.\n", n_blocks, THREADS_PER_BLOCK);
 
     uint32_t ended_hos = 0;
     uint32_t *fron_hos = new_host_array(vert_n);
@@ -228,12 +228,17 @@ int main(int argc, char *argv[])
         cudaDeviceSynchronize();
         
         copy_mem(&ended_hos, ended_dev, 1, DEV2HOS);
-        copy_mem(fron_hos, fron, vert_n, DEV2HOS);
+        copy_mem(fron_hos, dist, vert_n, DEV2HOS);
 
-        printf("Cabou ? %s\n", ended_hos ? "Sim" : "Não");
-        print_array(fron_hos, vert_n);
+        //printf("Cabou ? %s\n", ended_hos ? "Sim" : "Não");
+ //       print_array(fron_hos, vert_n);
+    }
+    
+    for (int i = 0; i < vert_n; ++i){
+      printf("%d\n", fron_hos[i]);
     }
 
+    //printf("Cont: %d\n", cnt);
     free_device_array(g_vert_dev);
     free_device_array(g_list_dev);
     free_device_array(dist);
