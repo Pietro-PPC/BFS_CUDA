@@ -220,6 +220,7 @@ void initialize_aux_arrays(uint32_t *dist_dev, uint32_t *proc_dev, uint32_t *fro
 */
 void calculate_bfs(uint32_t *dist_hos, uint32_t *g_vert_dev, uint32_t *g_list_dev, int vert_n, int edge_n){
 
+
     // Aloca e inicializa vetores de distância, vértices processados e fronteira na GPU
     uint32_t *dist_dev = new_device_array(vert_n);
     uint32_t *proc_dev = new_device_array(vert_n);
@@ -229,6 +230,7 @@ void calculate_bfs(uint32_t *dist_hos, uint32_t *g_vert_dev, uint32_t *g_list_de
     // Inicializa variáveis auxiliares
     int n_blocks = (vert_n + THREADS_PER_BLOCK-1) / THREADS_PER_BLOCK;
     uint32_t *ended_dev = new_device_array(1);
+    uint32_t *fron_hos = new_device_array(2000);
     uint32_t ended_hos = 0;
     int itcnt = 0;
     
@@ -243,9 +245,11 @@ void calculate_bfs(uint32_t *dist_hos, uint32_t *g_vert_dev, uint32_t *g_list_de
             vert_n+1, edge_n*2 + 1, ended_dev);
         cudaDeviceSynchronize();
 
+        copy_mem(fron_hos, fron_dev, 2000, DEV2HOS);
         copy_mem(&ended_hos, ended_dev, 1, DEV2HOS); // Copia variável 
     }
     copy_mem(dist_hos, dist_dev, vert_n, DEV2HOS);
+    print_array(fron_hos, 1800);
 
     free_device_array(dist_dev);
     free_device_array(proc_dev);
