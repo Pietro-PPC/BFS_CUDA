@@ -3,10 +3,10 @@
 #include <stack>
 #include <queue>
 
-#define MAX 5000
+#define MAX 500000
 
 struct graph_t{
-	std::vector<int> gl[MAX];
+	std::vector< std::vector<int> > gl;
 	int size;
 };
 
@@ -53,7 +53,7 @@ int count_components(graph_t &g){
 	int n_components = 0;
 	for (int u = 0; u < g.size; ++u)
 		if (!visited[u]){
-			std::cout << n_components++ << std::endl;
+      n_components++;
 			component_dfs(g, u, visited);
 		}
 
@@ -62,6 +62,8 @@ int count_components(graph_t &g){
 
 int main(){
 	graph_t g;
+  g.gl.resize(MAX);
+  g.size = 0;
 
 	int u, v;
 	while (std::cin >> u >> v){
@@ -72,11 +74,10 @@ int main(){
 	}
 
 	std::vector<int> dist = bfs(g, 0);
-  int mai = 0;
+
 	for (int i = 0; i < g.size; ++i){
-    //mai = std::max(mai, dist[i]);
     std::cout << dist[i] << std::endl;
 	}
-	std::cout << /*mai << */ std::endl;
+
 
 }
