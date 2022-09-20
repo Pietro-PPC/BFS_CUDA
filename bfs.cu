@@ -230,16 +230,19 @@ void calculate_bfs(uint32_t *dist_hos, uint32_t *g_vert_dev, uint32_t *g_list_de
     int n_blocks = (vert_n + THREADS_PER_BLOCK-1) / THREADS_PER_BLOCK;
     uint32_t *ended_dev = new_device_array(1);
     uint32_t ended_hos = 0;
+    int itcnt = 0;
     
     // Processa vértices até não haver ninguém na fronteira
     if (LOG) printf("%d blocos de %d threads.\n", n_blocks, THREADS_PER_BLOCK);
     while (!ended_hos){
+        if (LOG) printf("Iteração %d\n", ++itcnt);
+
         advance_frontier<<<n_blocks, THREADS_PER_BLOCK>>>(
             g_vert_dev, g_list_dev, 
             dist_dev, proc_dev, fron_dev, 
             vert_n+1, edge_n*2 + 1, ended_dev);
         cudaDeviceSynchronize();
-        
+
         copy_mem(&ended_hos, ended_dev, 1, DEV2HOS); // Copia variável 
     }
     copy_mem(dist_hos, dist_dev, vert_n, DEV2HOS);
@@ -276,7 +279,7 @@ int main(int argc, char *argv[])
     uint32_t *dist_hos = new_host_array(vert_n);
     calculate_bfs(dist_hos, g_vert_dev, g_list_dev, vert_n, edge_n);
 
-    print_array(dist_hos, vert_n);
+    if (!LOG) print_array(dist_hos, vert_n);
 
     // Libera memória
     free_host_array(dist_hos);
