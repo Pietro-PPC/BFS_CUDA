@@ -9,8 +9,6 @@
 
 #define LOG false
 
-// #define print_log(X) LOG ? printf(X) : printf("")
-
 #define GPU_NAME "GTX750-Ti"
 #define MP 5
 #define THREADS_PER_BLOCK 1024
@@ -46,6 +44,21 @@ void copy_mem(uint32_t *dstArr, uint32_t *srcArr, long long numElements, cudaMem
     }
 }
 
+/*
+    Invólucro para cudaMemSet para lidar com erros
+*/
+void set_mem(uint32_t *arr, unsigned char b, int numElements){
+    cudaError_t err = cudaSuccess;
+
+    size_t size = numElements * sizeof(uint32_t);
+    err = cudaMemset(arr, b, size);
+
+    if (err != cudaSuccess){
+        fprintf(stderr, "Falha ao copiar vetor (Erro: %s)!\n", cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+}
+
 
 /********** FUNÇÕES DE ALOCAÇÃO ***********/
 
@@ -57,7 +70,7 @@ uint32_t *new_device_array(uint32_t numElements){
 
     size_t size = numElements * sizeof(uint32_t);
     if (LOG)
-        printf("Alocando vetor de %d elementos na GPU\n", numElements); 
+        { printf("Alocando vetor de %d elementos na GPU\n", numElements); fflush(stdout);}
 
     uint32_t *d_arr = NULL;
     err = cudaMalloc((void **)&d_arr, size);
@@ -188,8 +201,8 @@ void advance_frontier(
         }
     }
 
-    // inicializa ended como 1
-    if (vertIdx == 0) *ended = 1;
+    // // inicializa ended como 1
+    // if (vertIdx == 0) *ended = 1;
     __syncthreads();
 
     // Se fronteira não estiver vazia, ended = 0
@@ -204,14 +217,14 @@ void advance_frontier(
         . fron_dev informa se cada vértice será processado na próxima iteração ou não
 */
 void initialize_aux_arrays(uint32_t *dist_dev, uint32_t *proc_dev, uint32_t *fron_dev, int vert_n){
-    cudaMemset(dist_dev, 0xff, vert_n*sizeof(uint32_t)); // Distância começa com "infinito"
-    cudaMemset(proc_dev, 0, vert_n*sizeof(uint32_t));    // Nenhum vértice foi processado
-    cudaMemset(fron_dev, 0, vert_n*sizeof(uint32_t));    // Nenhum vértice está na fronteira
+    set_mem(dist_dev, 0xff, vert_n); // Distância começa com "infinito"
+    set_mem(proc_dev, 0, vert_n);    // Nenhum vértice foi processado
+    set_mem(fron_dev, 0, vert_n);    // Nenhum vértice está na fronteira
 
-    int val;
+    uint32_t val;
     // Primeiro vértice tem distância 0 e pertence à fronteira.
-    val = 0; cudaMemcpy(dist_dev, &val, sizeof(uint32_t), HOS2DEV); // dist[0] = 0
-    val = 1; cudaMemcpy(fron_dev, &val, sizeof(uint32_t), HOS2DEV); // fron[0] = 1
+    val = 0; copy_mem(dist_dev, &val, 1, HOS2DEV); // dist[0] = 0
+    val = 1; copy_mem(fron_dev, &val, 1, HOS2DEV); // fron[0] = 1
 }
 
 
@@ -230,14 +243,15 @@ void calculate_bfs(uint32_t *dist_hos, uint32_t *g_vert_dev, uint32_t *g_list_de
     // Inicializa variáveis auxiliares
     int n_blocks = (vert_n + THREADS_PER_BLOCK-1) / THREADS_PER_BLOCK;
     uint32_t *ended_dev = new_device_array(1);
-    uint32_t *fron_hos = new_device_array(2000);
+    uint32_t *fron_hos = new_host_array(1800);
     uint32_t ended_hos = 0;
     int itcnt = 0;
     
     // Processa vértices até não haver ninguém na fronteira
-    if (LOG) printf("%d blocos de %d threads.\n", n_blocks, THREADS_PER_BLOCK);
+    if (LOG) {printf("%d blocos de %d threads.\n", n_blocks, THREADS_PER_BLOCK); fflush(stdout);}
     while (!ended_hos){
-        if (LOG) printf("Iteração %d\n", ++itcnt);
+        if (LOG) {printf("Iteração %d\n", ++itcnt); fflush(stdout);}
+        uint32_t val = 1; copy_mem(ended_dev, &val, 1, HOS2DEV);
 
         advance_frontier<<<n_blocks, THREADS_PER_BLOCK>>>(
             g_vert_dev, g_list_dev, 
@@ -245,8 +259,8 @@ void calculate_bfs(uint32_t *dist_hos, uint32_t *g_vert_dev, uint32_t *g_list_de
             vert_n+1, edge_n*2 + 1, ended_dev);
         cudaDeviceSynchronize();
 
-        copy_mem(fron_hos, fron_dev, 2000, DEV2HOS);
-        copy_mem(&ended_hos, ended_dev, 1, DEV2HOS); // Copia variável 
+        copy_mem(fron_hos, fron_dev, 1800, DEV2HOS);
+        // copy_mem(&ended_hos, ended_dev, 1, DEV2HOS); // Copia variável 
     }
     copy_mem(dist_hos, dist_dev, vert_n, DEV2HOS);
     print_array(fron_hos, 1800);

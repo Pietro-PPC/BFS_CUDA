@@ -78,6 +78,7 @@ int main(){
 	for (int i = 0; i < g.size; ++i){
     std::cout << dist[i] << std::endl;
 	}
-
+  
+  std::cout << "Número de componentes " << count_components(g) << std::endl;
 
 }
