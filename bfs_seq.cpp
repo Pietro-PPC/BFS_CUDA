@@ -5,7 +5,7 @@
 
 #include "chrono.c"
 
-#define LOG false
+#define LOG true
 #define MAX 500000
 
 struct graph_t{

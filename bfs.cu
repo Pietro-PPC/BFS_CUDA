@@ -7,7 +7,7 @@
 #include <vector>
 #include "chrono.c"
 
-#define LOG false
+#define LOG true
 
 #define GPU_NAME "GTX750-Ti"
 #define MP 5
