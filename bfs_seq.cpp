@@ -3,6 +3,7 @@
 #include <stack>
 #include <queue>
 
+#define LOG false
 #define MAX 500000
 
 struct graph_t{
@@ -62,8 +63,8 @@ int count_components(graph_t &g){
 
 int main(){
 	graph_t g;
-  g.gl.resize(MAX);
-  g.size = 0;
+	g.gl.resize(MAX);
+	g.size = 0;
 
 	int u, v;
 	while (std::cin >> u >> v){
@@ -75,10 +76,16 @@ int main(){
 
 	std::vector<int> dist = bfs(g, 0);
 
-	for (int i = 0; i < g.size; ++i){
-    std::cout << dist[i] << std::endl;
-	}
-  
-  std::cout << "Número de componentes " << count_components(g) << std::endl;
+	if (!LOG)
+		for (int i = 0; i < g.size; ++i)
+	    	std::cout << dist[i] << std::endl;
+  	else{
+		int max_dst = 0;
+  		for (int i = 0; i < g.size; ++i)
+	    	max_dst = std::max(max_dst, dist[i]);
+		
+  		std::cout << "Número de componentes: " << count_components(g) << std::endl;
+  		std::cout << "Distancia maxima: " << max_dst << std::endl;
+  	}
 
 }
