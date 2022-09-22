@@ -286,7 +286,13 @@ void calculate_bfs(uint32_t *dist_hos, uint32_t *g_vert_dev, uint32_t *g_list_de
         copy_mem(&ended_hos, ended_dev, 1, DEV2HOS); // Copia ended para saber se bfs deve terminar
     }
     chrono_stop(&chrono);
-    if (LOG) {printf("Tempo total: %.3lf ms\n", chrono_gettotal(&chrono)/1e6); fflush(stdout);}
+
+
+    if (LOG) {
+        printf("Distancia maxima: %d\n", itcnt-1);
+        printf("Tempo total: %.3lf ms\n", chrono_gettotal(&chrono)/1e6); 
+        fflush(stdout);
+    }
 
     copy_mem(dist_hos, dist_dev, vert_n, DEV2HOS);
 
