@@ -18,6 +18,7 @@
 
 #define HOS2DEV cudaMemcpyHostToDevice
 #define DEV2HOS cudaMemcpyDeviceToHost
+#define DEV2DEV cudaMemcpyDeviceToDevice
 
 /*
     Função auxiliar para imprimir vetor
@@ -177,7 +178,7 @@ void gen_dev_graph(std::vector< std::pair<int,int> > &edges,
 __global__ 
 void advance_frontier(
     uint32_t *g_vert, uint32_t *g_list, 
-    uint32_t *dist, uint32_t *proc, uint32_t *fron, 
+    uint32_t *dist, uint32_t *proc, uint32_t *fron_in, uint32_t *fron_out, 
     int vert_sz, int list_sz, uint32_t *ended){
 
     // Calcula índice da thread no total.
@@ -190,24 +191,36 @@ void advance_frontier(
     if (vertIdx >= vert_sz-1) return;
 
     // Processa vértices na fronteira
-    if (fron[vertIdx]){
-        fron[vertIdx] = 0;
+    if (fron_in[vertIdx] == 1){
+        // ordem  proc=1 -> fron=0 importante para vértice nunca 
+        // ficar fora da fronteira e sem ser processado
         proc[vertIdx] = 1;
         for (int i = g_vert[vertIdx]; i < g_vert[vertIdx+1]; ++i){
-            if (!proc[ g_list[i] ]){
-                fron[ g_list[i] ] = 1;
+            if (!proc[ g_list[i] ] && !fron_in[g_list[i]]){
+                fron_out[ g_list[i] ] = 1;
                 dist[ g_list[i] ] = dist[vertIdx] + 1;
             }
         }
     }
+}
 
-    // // inicializa ended como 1
-    // if (vertIdx == 0) *ended = 1;
-    __syncthreads();
 
-    // Se fronteira não estiver vazia, ended = 0
-    if ( fron[vertIdx] ) *ended = 0;
+/*
+    Atualiza os valores de todos os elementos na fronteira de 2 para 1
+    Atualiza a variável ended caso ainda exista algum elemento na fronteira.
+*/
+__global__
+void update_frontier(uint32_t *fron, int fron_sz, uint32_t *ended){
+    // Calcula índice da thread no total
+    int vertIdx = blockIdx.x*blockDim.x + threadIdx.x;
 
+    // Retorna caso vértice seja inválido
+    if (vertIdx >= fron_sz) return;
+
+    // Se fronteira não estiver vazia, ela é atualizada para 1 e ended = 0
+    if ( fron[vertIdx] == 1 ) 
+        *ended = 0;
+    
 }
 
 /*
@@ -216,15 +229,16 @@ void advance_frontier(
         . proc_dev informa se cada vértice foi processado ou não
         . fron_dev informa se cada vértice será processado na próxima iteração ou não
 */
-void initialize_aux_arrays(uint32_t *dist_dev, uint32_t *proc_dev, uint32_t *fron_dev, int vert_n){
+void initialize_aux_arrays(uint32_t *dist_dev, uint32_t *proc_dev, uint32_t *fron_in_dev, uint32_t *fron_out_dev, int vert_n){
     set_mem(dist_dev, 0xff, vert_n); // Distância começa com "infinito"
     set_mem(proc_dev, 0, vert_n);    // Nenhum vértice foi processado
-    set_mem(fron_dev, 0, vert_n);    // Nenhum vértice está na fronteira
+    set_mem(fron_in_dev, 0, vert_n);     // Nenhum vértice está na fronteira
+    set_mem(fron_out_dev, 0, vert_n);    // Nenhum vértice está na fronteira
 
     uint32_t val;
     // Primeiro vértice tem distância 0 e pertence à fronteira.
     val = 0; copy_mem(dist_dev, &val, 1, HOS2DEV); // dist[0] = 0
-    val = 1; copy_mem(fron_dev, &val, 1, HOS2DEV); // fron[0] = 1
+    val = 1; copy_mem(fron_in_dev, &val, 1, HOS2DEV); 
 }
 
 
@@ -237,37 +251,41 @@ void calculate_bfs(uint32_t *dist_hos, uint32_t *g_vert_dev, uint32_t *g_list_de
     // Aloca e inicializa vetores de distância, vértices processados e fronteira na GPU
     uint32_t *dist_dev = new_device_array(vert_n);
     uint32_t *proc_dev = new_device_array(vert_n);
-    uint32_t *fron_dev = new_device_array(vert_n);
-    initialize_aux_arrays(dist_dev, proc_dev, fron_dev, vert_n);
+    uint32_t *fron_in_dev = new_device_array(vert_n);
+    uint32_t *fron_out_dev = new_device_array(vert_n);
+    initialize_aux_arrays(dist_dev, proc_dev, fron_in_dev, fron_out_dev, vert_n);
 
     // Inicializa variáveis auxiliares
     int n_blocks = (vert_n + THREADS_PER_BLOCK-1) / THREADS_PER_BLOCK;
     uint32_t *ended_dev = new_device_array(1);
-    uint32_t *fron_hos = new_host_array(1800);
     uint32_t ended_hos = 0;
     int itcnt = 0;
     
     // Processa vértices até não haver ninguém na fronteira
     if (LOG) {printf("%d blocos de %d threads.\n", n_blocks, THREADS_PER_BLOCK); fflush(stdout);}
     while (!ended_hos){
-        if (LOG) {printf("Iteração %d\n", ++itcnt); fflush(stdout);}
+        if (LOG) {printf("Iteração %d\n", itcnt++); fflush(stdout);}
         uint32_t val = 1; copy_mem(ended_dev, &val, 1, HOS2DEV);
 
         advance_frontier<<<n_blocks, THREADS_PER_BLOCK>>>(
             g_vert_dev, g_list_dev, 
-            dist_dev, proc_dev, fron_dev, 
+            dist_dev, proc_dev, fron_in_dev, fron_out_dev, 
             vert_n+1, edge_n*2 + 1, ended_dev);
-        cudaDeviceSynchronize();
 
-        copy_mem(fron_hos, fron_dev, 1800, DEV2HOS);
-        // copy_mem(&ended_hos, ended_dev, 1, DEV2HOS); // Copia variável 
+
+        update_frontier<<<n_blocks, THREADS_PER_BLOCK>>>(fron_out_dev, vert_n, ended_dev);
+        
+        copy_mem(fron_in_dev, fron_out_dev, vert_n, DEV2DEV);
+        set_mem(fron_out_dev, 0, vert_n);
+
+        copy_mem(&ended_hos, ended_dev, 1, DEV2HOS); // Copia ended para saber se bfs deve terminar
     }
     copy_mem(dist_hos, dist_dev, vert_n, DEV2HOS);
-    print_array(fron_hos, 1800);
 
     free_device_array(dist_dev);
     free_device_array(proc_dev);
-    free_device_array(fron_dev);
+    free_device_array(fron_in_dev);
+    free_device_array(fron_out_dev);
 }
 
 /*
