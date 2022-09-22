@@ -94,7 +94,7 @@ int main(){
 		
   		std::cout << "Número de componentes: " << count_components(g) << std::endl;
   		std::cout << "Distancia maxima: " << max_dst << std::endl;
-  		std::cout << std::fixed << std::setprecision(1) << "Tempo total: " << chrono_gettotal(&chrono)/1e6 << " ms" << std::endl;
+  		std::cout << std::fixed << std::setprecision(3) << "Tempo total: " << chrono_gettotal(&chrono)/1e6 << " ms" << std::endl;
   	}
 
 }
