@@ -3,6 +3,8 @@
 #include <stack>
 #include <queue>
 
+#include "chrono.c"
+
 #define LOG false
 #define MAX 500000
 
@@ -74,7 +76,12 @@ int main(){
 		g.size = std::max(g.size, v+1);
 	}
 
+	chronometer_t chrono;
+	chrono_reset(&chrono);
+	chrono_start(&chrono);
 	std::vector<int> dist = bfs(g, 0);
+	chrono_stop(&chrono);
+
 
 	if (!LOG)
 		for (int i = 0; i < g.size; ++i)
@@ -86,6 +93,7 @@ int main(){
 		
   		std::cout << "Número de componentes: " << count_components(g) << std::endl;
   		std::cout << "Distancia maxima: " << max_dst << std::endl;
+  		std::cout << fixed << setprecision(1) << "Tempo total: " << chrono_gettotal(&chrono)/1e6 << " ms"; << std::endl;
   	}
 
 }

@@ -246,7 +246,7 @@ void initialize_aux_arrays(uint32_t *dist_dev, uint32_t *proc_dev, uint32_t *fro
     Roda BFS calculando vetor de distâncias
 */
 void calculate_bfs(uint32_t *dist_hos, uint32_t *g_vert_dev, uint32_t *g_list_dev, int vert_n, int edge_n){
-
+    chronometer_t chrono;
 
     // Aloca e inicializa vetores de distância, vértices processados e fronteira na GPU
     uint32_t *dist_dev = new_device_array(vert_n);
@@ -262,9 +262,13 @@ void calculate_bfs(uint32_t *dist_hos, uint32_t *g_vert_dev, uint32_t *g_list_de
     int itcnt = 0;
     
     // Processa vértices até não haver ninguém na fronteira
-    if (LOG) {printf("%d blocos de %d threads.\n", n_blocks, THREADS_PER_BLOCK); fflush(stdout);}
+    if (LOG) {printf("Criando %d blocos de %d threads.\n", n_blocks, THREADS_PER_BLOCK); fflush(stdout);}
+
+    chrono_reset(&chrono);
+    chrono_start(&chrono);
     while (!ended_hos){
-        if (LOG) {printf("Iteração %d\n", itcnt++); fflush(stdout);}
+        itcnt++;
+        // if (LOG) {printf("Iteração %d\n", itcnt++); fflush(stdout);}
         uint32_t val = 1; copy_mem(ended_dev, &val, 1, HOS2DEV);
 
         advance_frontier<<<n_blocks, THREADS_PER_BLOCK>>>(
@@ -275,11 +279,15 @@ void calculate_bfs(uint32_t *dist_hos, uint32_t *g_vert_dev, uint32_t *g_list_de
 
         update_frontier<<<n_blocks, THREADS_PER_BLOCK>>>(fron_out_dev, vert_n, ended_dev);
         
+        // Fronteira de entrada recebe fronteira de saída e fronteira de saída é reiniciada
         copy_mem(fron_in_dev, fron_out_dev, vert_n, DEV2DEV);
         set_mem(fron_out_dev, 0, vert_n);
 
         copy_mem(&ended_hos, ended_dev, 1, DEV2HOS); // Copia ended para saber se bfs deve terminar
     }
+    chrono_stop(&chrono);
+    printf("Tempo total: %.1lf ms", chrono_gettotal(&chrono)/1e6);
+
     copy_mem(dist_hos, dist_dev, vert_n, DEV2HOS);
 
     free_device_array(dist_dev);
